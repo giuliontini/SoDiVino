@@ -7,6 +7,7 @@ import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 export default function SignupPage() {
   const router = useRouter();
+  const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -19,9 +20,20 @@ export default function SignupPage() {
     setMessage(null);
     setLoading(true);
 
+    if (!displayName.trim()) {
+      setError("Enter a display name.");
+      setLoading(false);
+      return;
+    }
+
     const { data, error: signUpError } = await supabaseBrowser.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          display_name: displayName.trim(),
+        },
+      },
     });
 
     if (signUpError) {
@@ -44,10 +56,19 @@ export default function SignupPage() {
       <div className="w-full max-w-md space-y-6 bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg">
         <div>
           <h1 className="text-2xl font-semibold">Create your account</h1>
-          <p className="text-sm text-slate-400 mt-1">Sign up to save personas and get tailored wine picks.</p>
+          <p className="text-slate-400">Sign up to get started with So DiVino.</p>
         </div>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
+          <label className="block text-sm">
+            Display name
+            <input
+              className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              required
+            />
+          </label>
           <label className="block text-sm">
             Email
             <input

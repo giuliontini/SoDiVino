@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   WinePersona,
@@ -11,6 +12,7 @@ import {
   sweetnessLevels,
   wineColors
 } from "@/lib/cellarTypes";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
 
 interface PersonaFormState {
   id?: string;
@@ -68,13 +70,28 @@ export default function CellarPage() {
   const [savingPersona, setSavingPersona] = useState(false);
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   const defaultPersonaId = useMemo(() => personas.find((p) => p.is_default)?.id, [personas]);
 
   useEffect(() => {
     async function load() {
       try {
-        const [personaRes, prefsRes] = await Promise.all([fetch("/api/personas"), fetch("/api/user-prefs")]);
+        const [{ data: userData, error: userError }, personaRes, prefsRes] = await Promise.all([
+          supabaseBrowser.auth.getUser(),
+          fetch("/api/personas"),
+          fetch("/api/user-prefs")
+        ]);
+
+        if (userError) {
+          throw new Error(userError.message);
+        }
+
+        if (userData?.user) {
+          setDisplayName(userData.user.user_metadata?.display_name ?? null);
+          setUserEmail(userData.user.email ?? null);
+        }
 
         const personaJson = await personaRes.json();
         const prefsJson = await prefsRes.json();
@@ -247,6 +264,8 @@ export default function CellarPage() {
     );
   }
 
+  const friendlyName = displayName || userEmail;
+
   return (
     <main className="min-h-screen bg-slate-900 text-slate-50 p-6">
       <div className="max-w-5xl mx-auto space-y-6">
@@ -254,13 +273,22 @@ export default function CellarPage() {
           <div>
             <h1 className="text-2xl font-semibold">Cellar</h1>
             <p className="text-sm text-slate-400">Manage your wine personas and preferences.</p>
+            {friendlyName && <p className="text-sm text-slate-400">Signed in as {friendlyName}.</p>}
           </div>
-          <button
-            className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium hover:bg-indigo-500"
-            onClick={resetPersonaForm}
-          >
-            New persona
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/"
+              className="rounded-md border border-slate-700 px-3 py-2 text-sm font-medium hover:bg-slate-800"
+            >
+              Back to menu
+            </Link>
+            <button
+              className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium hover:bg-indigo-500"
+              onClick={resetPersonaForm}
+            >
+              New persona
+            </button>
+          </div>
         </div>
 
         {error && <p className="text-sm text-red-400">{error}</p>}

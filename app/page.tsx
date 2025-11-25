@@ -23,6 +23,8 @@ export default function HomePage() {
   const [personas, setPersonas] = useState<WinePersona[]>([]);
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [selectedPersonaId, setSelectedPersonaId] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   const [menuFile, setMenuFile] = useState<File | null>(null);
   const [restaurantName, setRestaurantName] = useState("");
@@ -39,6 +41,20 @@ export default function HomePage() {
     let cancelled = false;
     async function load() {
       try {
+        const { data: userData, error: userError } = await supabaseBrowser.auth.getUser();
+        if (userError || !userData?.user) {
+          if (!cancelled) {
+            setIsAuthenticated(false);
+            setLoadingData(false);
+          }
+          return;
+        }
+
+        if (!cancelled) {
+          setDisplayName(userData.user.user_metadata?.display_name ?? null);
+          setUserEmail(userData.user.email ?? null);
+        }
+
         const personasRes = await fetch("/api/personas");
         if (personasRes.status === 401) {
           if (!cancelled) {
@@ -188,6 +204,7 @@ export default function HomePage() {
   }, [parsedWines]);
 
   const hasMenu = parsedWines.length > 0 || Boolean(parsedListId);
+  const friendlyName = displayName || userEmail;
 
   if (loadingData && isAuthenticated === null) {
     return (
@@ -229,11 +246,11 @@ export default function HomePage() {
       <div className="max-w-6xl mx-auto px-4 py-10 space-y-8">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.2em] text-indigo-300">Wine Menu Agent</p>
-            <h1 className="text-3xl font-semibold">Define your cellar, parse the menu, get the perfect pour.</h1>
-            <p className="text-slate-300">
-              Build personas for your taste, upload a wine list photo, and let AI highlight the best matches.
+            <h1 className="text-xl uppercase tracking-[0.2em] text-indigo-300">So DiVino</h1>
+            <p className="text-lg">
+              Define your cellar, upload a wine list photo, get the perfect pour.
             </p>
+            {friendlyName && <p className="text-sm text-slate-400">Welcome Back {friendlyName}.</p>}
             {preferences && (
               <p className="text-sm text-slate-400">
                 Global preferences: {preferences.risk_tolerance} • {preferences.quality_tier} • Budget{" "}
@@ -241,7 +258,7 @@ export default function HomePage() {
               </p>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2">          
             <Link
               href="/cellar"
               className="rounded-md border border-slate-700 px-4 py-2 text-sm font-semibold hover:bg-slate-900"
