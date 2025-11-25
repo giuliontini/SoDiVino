@@ -1,17 +1,16 @@
-import { NextRequest } from "next/server";
+import { createSupabaseServerClient } from "./supabaseServer";
 
-export function getUserIdFromRequest(req: NextRequest): string | null {
-  const fromHeader = req.headers.get("x-user-id")?.trim();
-  if (fromHeader) return fromHeader;
-
-  const fromEnv = process.env.DEMO_USER_ID?.trim();
-  return fromEnv && fromEnv.length > 0 ? fromEnv : null;
+export async function createSupabaseServerAuthClient() {
+  return createSupabaseServerClient();
 }
 
-export function requireUserId(req: NextRequest): string {
-  const userId = getUserIdFromRequest(req);
-  if (!userId) {
-    throw new Error("Unauthorized: missing user id");
+export async function getUserId(): Promise<string> {
+  const supabase = await createSupabaseServerAuthClient();
+  const { data, error } = await supabase.auth.getUser();
+
+  if (error || !data?.user) {
+    throw new Error("UNAUTHENTICATED");
   }
-  return userId;
+
+  return data.user.id;
 }

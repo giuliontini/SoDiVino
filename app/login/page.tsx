@@ -1,0 +1,84 @@
+"use client";
+
+import { type FormEvent, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    const { error: signInError } = await supabaseBrowser.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (signInError) {
+      setError(signInError.message);
+      setLoading(false);
+      return;
+    }
+
+    router.push("/");
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center px-4">
+      <div className="w-full max-w-md space-y-6 bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg">
+        <div>
+          <h1 className="text-2xl font-semibold">Welcome back</h1>
+          <p className="text-sm text-slate-400 mt-1">Log in to access your cellar and recommendations.</p>
+        </div>
+
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <label className="block text-sm">
+            Email
+            <input
+              className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </label>
+          <label className="block text-sm">
+            Password
+            <input
+              className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </label>
+
+          {error && <p className="text-sm text-red-400">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full inline-flex justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold hover:bg-indigo-500 disabled:opacity-70"
+          >
+            {loading ? "Logging in…" : "Log in"}
+          </button>
+        </form>
+
+        <p className="text-sm text-slate-400">
+          Don&apos;t have an account?{" "}
+          <Link className="text-indigo-400 hover:text-indigo-300 underline" href="/signup">
+            Sign up
+          </Link>
+        </p>
+      </div>
+    </main>
+  );
+}

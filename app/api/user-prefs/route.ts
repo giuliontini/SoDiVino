@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUserId } from "@/lib/auth";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { getUserId } from "@/lib/auth";
+import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { validateUserPreferencesInput } from "@/lib/validators";
 
 const defaultPreferences = {
@@ -11,58 +11,64 @@ const defaultPreferences = {
   risk_tolerance: "safe"
 } as const;
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const userId = requireUserId(req);
-    const { data, error } = await supabaseServer
+    const supabase = await createSupabaseServerClient();
+    const userId = await getUserId();
+    const { data, error } = await supabase
       .from("user_preferences")
       .select("*")
       .eq("user_id", userId)
       .maybeSingle();
 
-    if (error) throw error;
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
     if (data) return NextResponse.json({ preferences: data });
 
-    const { data: inserted, error: insertError } = await supabaseServer
+    const { data: inserted, error: insertError } = await supabase
       .from("user_preferences")
       .insert([{ ...defaultPreferences, user_id: userId }])
       .select()
       .single();
 
-    if (insertError) throw insertError;
+    if (insertError) {
+      return NextResponse.json({ error: insertError.message }, { status: 500 });
+    }
 
     return NextResponse.json({ preferences: inserted });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unexpected error";
-    if (message.startsWith("Unauthorized")) {
-      return NextResponse.json({ error: message }, { status: 401 });
+  } catch (err: unknown) {
+    if ((err as Error)?.message === "UNAUTHENTICATED") {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
 export async function PUT(req: NextRequest) {
   try {
-    const userId = requireUserId(req);
+    const supabase = await createSupabaseServerClient();
+    const userId = await getUserId();
     const body = await req.json();
     const { data: payload, error } = validateUserPreferencesInput(body);
     if (error) return error;
 
-    const { data, error: upsertError } = await supabaseServer
+    const { data, error: upsertError } = await supabase
       .from("user_preferences")
       .upsert({ user_id: userId, ...payload })
       .select()
       .single();
 
-    if (upsertError) throw upsertError;
+    if (upsertError) {
+      return NextResponse.json({ error: upsertError.message }, { status: 500 });
+    }
 
     return NextResponse.json({ preferences: data });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unexpected error";
-    if (message.startsWith("Unauthorized")) {
-      return NextResponse.json({ error: message }, { status: 401 });
+  } catch (err: unknown) {
+    if ((err as Error)?.message === "UNAUTHENTICATED") {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

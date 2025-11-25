@@ -1,52 +1,58 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUserId } from "@/lib/auth";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { getUserId } from "@/lib/auth";
+import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { validatePersonaInput } from "@/lib/validators";
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const userId = requireUserId(req);
+    const supabase = await createSupabaseServerClient();
+    const userId = await getUserId();
+    const { id } = await params;
     const body = await req.json();
     const { data: payload, error } = validatePersonaInput(body);
     if (error) return error;
 
     if (payload?.is_default) {
-      await supabaseServer.from("wine_personas").update({ is_default: false }).eq("user_id", userId);
+      await supabase.from("wine_personas").update({ is_default: false }).eq("user_id", userId);
     }
 
-    const { data, error: updateError } = await supabaseServer
+    const { data, error: updateError } = await supabase
       .from("wine_personas")
       .update(payload)
-      .eq("id", params.id)
+      .eq("id", id)
       .eq("user_id", userId)
       .select()
       .single();
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
 
     return NextResponse.json({ persona: data });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unexpected error";
-    if (message.startsWith("Unauthorized")) {
-      return NextResponse.json({ error: message }, { status: 401 });
+  } catch (err: unknown) {
+    if ((err as Error)?.message === "UNAUTHENTICATED") {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const userId = requireUserId(req);
-    const { error } = await supabaseServer.from("wine_personas").delete().eq("id", params.id).eq("user_id", userId);
+    const supabase = await createSupabaseServerClient();
+    const userId = await getUserId();
+    const { id } = await params;
+    const { error } = await supabase.from("wine_personas").delete().eq("id", id).eq("user_id", userId);
 
-    if (error) throw error;
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
     return NextResponse.json({ ok: true });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unexpected error";
-    if (message.startsWith("Unauthorized")) {
-      return NextResponse.json({ error: message }, { status: 401 });
+  } catch (err: unknown) {
+    if ((err as Error)?.message === "UNAUTHENTICATED") {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
