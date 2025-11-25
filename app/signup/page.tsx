@@ -26,10 +26,14 @@ export default function SignupPage() {
       return;
     }
 
+    const loginRedirectUrl =
+      typeof window === "undefined" ? undefined : `${window.location.origin}/login`;
+
     const { data, error: signUpError } = await supabaseBrowser.auth.signUp({
       email,
       password,
       options: {
+        emailRedirectTo: loginRedirectUrl,
         data: {
           display_name: displayName.trim(),
         },
