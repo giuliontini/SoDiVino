@@ -67,10 +67,11 @@ export async function POST(req: NextRequest) {
       parsedCount: wines.length,
       top,
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error(err);
+    const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json(
-      { error: "Internal server error", details: err?.message || String(err) },
+      { error: "Internal server error", details: message },
       { status: 500 },
     );
   }

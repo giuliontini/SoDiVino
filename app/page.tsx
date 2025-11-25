@@ -97,8 +97,9 @@ export default function HomePage() {
       setStatus(`Parsed ${data.parsedCount} wines. Showing top ${data.top.length} suggestions.`);
       setResults(data.top);
       setParsedCount(data.parsedCount ?? null);
-    } catch (err: any) {
-      setStatus("Unexpected error: " + err.message);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unexpected error";
+      setStatus("Unexpected error: " + message);
     } finally {
       setLoading(false);
     }
