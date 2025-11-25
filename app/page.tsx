@@ -218,7 +218,7 @@ export default function HomePage() {
     return (
       <main className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center px-4">
         <div className="max-w-3xl w-full space-y-4 text-center">
-          <h1 className="text-3xl font-semibold">Wine Menu Agent</h1>
+          <h1 className="text-xl uppercase tracking-[0.2em] text-indigo-300">So DiVino</h1>
           <p className="text-lg text-slate-300">
             Sign up or log in to define your cellar and get personalized wine recommendations.
           </p>
