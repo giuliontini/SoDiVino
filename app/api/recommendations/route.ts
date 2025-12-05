@@ -3,6 +3,11 @@ import { getUserId } from "@/lib/auth";
 import type { WinePersona, UserPreferences } from "@/lib/cellarTypes";
 import { rateWinesWithLLM } from "@/lib/recommendations";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import {
+  mapTasteProfileToPersona,
+  mapTasteProfileToPreferences,
+  type TasteProfile,
+} from "@/lib/tasteProfiles";
 import type { WineItem, WineRecommendation } from "@/lib/wineTypes";
 
 const BATCH_SIZE = 10;
@@ -17,6 +22,7 @@ interface RecommendationsRequestBody {
   parsedListId?: unknown;
   listId?: unknown;
   wines?: unknown;
+  tasteProfileId?: unknown;
 }
 
 export async function POST(req: NextRequest) {
@@ -29,11 +35,18 @@ export async function POST(req: NextRequest) {
       return parsed.error;
     }
 
-    const personaIds = parsed.personaIds;
-    const [personas, preferences] = await Promise.all([
-      loadPersonas(supabase, userId, personaIds),
-      loadUserPreferences(supabase, userId),
-    ]);
+    const personaContext = await resolvePersonaContext(
+      supabase,
+      userId,
+      parsed.personaIds,
+      parsed.tasteProfileId,
+    );
+
+    if ("error" in personaContext) {
+      return personaContext.error;
+    }
+
+    const { personas, preferences } = personaContext;
 
     if (personas.length === 0) {
       return NextResponse.json({ error: "No personas found for this user" }, { status: 404 });
@@ -72,15 +85,22 @@ export async function POST(req: NextRequest) {
 function parseRequestBody(
   body: RecommendationsRequestBody | null,
 ):
-  | { personaIds: string[]; parsedListId?: string; wines?: unknown[] }
+  | { personaIds: string[]; parsedListId?: string; wines?: unknown[]; tasteProfileId?: string }
   | { error: NextResponse } {
   if (!body || typeof body !== "object") {
     return { error: NextResponse.json({ error: "Body must be a JSON object" }, { status: 400 }) };
   }
 
   const personaIds = normalizeStringArray(body.personaIds).filter(Boolean);
-  if (!personaIds.length) {
-    return { error: NextResponse.json({ error: "personaIds must contain at least one id" }, { status: 400 }) };
+
+  const tasteProfileId = typeof body.tasteProfileId === "string" ? body.tasteProfileId.trim() : undefined;
+  if (!personaIds.length && !tasteProfileId) {
+    return {
+      error: NextResponse.json(
+        { error: "Provide either personaIds or a tasteProfileId" },
+        { status: 400 },
+      ),
+    };
   }
 
   const parsedListId =
@@ -102,7 +122,7 @@ function parseRequestBody(
     wines = body.wines;
   }
 
-  return { personaIds: Array.from(new Set(personaIds)), parsedListId, wines };
+  return { personaIds: Array.from(new Set(personaIds)), parsedListId, wines, tasteProfileId };
 }
 
 async function loadPersonas(
@@ -110,6 +130,9 @@ async function loadPersonas(
   userId: string,
   personaIds: string[],
 ): Promise<WinePersona[]> {
+  if (!personaIds.length) {
+    return [];
+  }
   const { data, error } = await supabase
     .from("wine_personas")
     .select("*")
@@ -121,6 +144,55 @@ async function loadPersonas(
   }
 
   return data ?? [];
+}
+
+async function loadTasteProfile(
+  supabase: SupabaseServerClient,
+  userId: string,
+  tasteProfileId: string,
+): Promise<TasteProfile | null> {
+  const { data, error } = await supabase
+    .from("taste_profiles")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("id", tasteProfileId)
+    .maybeSingle();
+
+  if (error && error.code !== "PGRST116") {
+    throw error;
+  }
+
+  return (data as TasteProfile | null) ?? null;
+}
+
+async function resolvePersonaContext(
+  supabase: SupabaseServerClient,
+  userId: string,
+  personaIds: string[],
+  tasteProfileId?: string,
+): Promise<{ personas: WinePersona[]; preferences: UserPreferences | null } | { error: NextResponse }> {
+  if (personaIds.length > 0) {
+    const [personas, preferences] = await Promise.all([
+      loadPersonas(supabase, userId, personaIds),
+      loadUserPreferences(supabase, userId),
+    ]);
+    return { personas, preferences };
+  }
+
+  if (tasteProfileId) {
+    const tasteProfile = await loadTasteProfile(supabase, userId, tasteProfileId);
+    if (!tasteProfile) {
+      return { error: NextResponse.json({ error: "Taste profile not found" }, { status: 404 }) };
+    }
+    return {
+      personas: [mapTasteProfileToPersona(tasteProfile)],
+      preferences: mapTasteProfileToPreferences(tasteProfile),
+    };
+  }
+
+  return {
+    error: NextResponse.json({ error: "No persona or taste profile supplied" }, { status: 400 }),
+  };
 }
 
 async function loadUserPreferences(supabase: SupabaseServerClient, userId: string): Promise<UserPreferences | null> {
