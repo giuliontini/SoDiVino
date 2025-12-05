@@ -1,12 +1,12 @@
-// app/page.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { WinePersona, UserPreferences } from "@/lib/cellarTypes";
 import type { WineItem, WineRecommendation } from "@/lib/wineTypes";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
+import { LandingHero } from "./components/figma/landing-hero";
+import { MainExperience } from "./components/figma/main-experience";
 
 type ParseMenuResponse = {
   wines?: WineItem[];
@@ -39,6 +39,7 @@ export default function HomePage() {
 
   useEffect(() => {
     let cancelled = false;
+
     async function load() {
       try {
         const { data: userData, error: userError } = await supabaseBrowser.auth.getUser();
@@ -109,10 +110,18 @@ export default function HomePage() {
     };
   }, []);
 
+  const friendlyName = displayName || userEmail;
+
   async function handleSignOut() {
     await supabaseBrowser.auth.signOut();
     setIsAuthenticated(false);
     router.push("/login");
+  }
+
+  function handleFileSelected(file: File | null) {
+    setMenuFile(file);
+    setStatusMessage(null);
+    setError(null);
   }
 
   async function handleUpload() {
@@ -197,217 +206,41 @@ export default function HomePage() {
     }
   }
 
-  const wineLookup = useMemo(() => {
-    const map = new Map<string, WineItem>();
-    parsedWines.forEach((wine) => map.set(wine.id, wine));
-    return map;
-  }, [parsedWines]);
-
-  const hasMenu = parsedWines.length > 0 || Boolean(parsedListId);
-  const friendlyName = displayName || userEmail;
-
   if (loadingData && isAuthenticated === null) {
     return (
-      <main className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center">
-        <p className="text-sm text-slate-400">Loading Wine Menu Agent…</p>
-      </main>
-    );
-  }
-
-  if (isAuthenticated === false) {
-    return (
-      <main className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center px-4">
-        <div className="max-w-3xl w-full space-y-4 text-center">
-          <h1 className="text-xl uppercase tracking-[0.2em] text-indigo-300">So DiVino</h1>
-          <p className="text-lg text-slate-300">
-            Sign up or log in to define your cellar and get personalized wine recommendations.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link
-              href="/signup"
-              className="inline-flex justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold hover:bg-indigo-500"
-            >
-              Sign up
-            </Link>
-            <Link
-              href="/login"
-              className="inline-flex justify-center rounded-md border border-slate-700 px-4 py-2 text-sm font-semibold hover:bg-slate-800"
-            >
-              Log in
-            </Link>
-          </div>
+      <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#f8f5f2] via-[#faf8f6] to-[#f0ebe6] text-[#2c2c2c]">
+        <div className="rounded-3xl border border-white/70 bg-white/80 px-6 py-4 text-sm text-[#6b6b6b] shadow-lg backdrop-blur">
+          Preparing the refreshed So DiVino experience…
         </div>
       </main>
     );
   }
 
+  if (isAuthenticated === false) {
+    return <LandingHero onLogin={() => router.push("/login")} onSignup={() => router.push("/signup")} />;
+  }
+
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="max-w-6xl mx-auto px-4 py-10 space-y-8">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-2">
-            <h1 className="text-xl uppercase tracking-[0.2em] text-indigo-300">So DiVino</h1>
-            <p className="text-lg">
-              Define your cellar, upload a wine list photo, get the perfect pour.
-            </p>
-            {friendlyName && <p className="text-sm text-slate-400">Welcome Back {friendlyName}.</p>}
-            {preferences && (
-              <p className="text-sm text-slate-400">
-                Global preferences: {preferences.risk_tolerance} • {preferences.quality_tier} • Budget{" "}
-                {preferences.usual_budget_min ?? "?"} - {preferences.usual_budget_max ?? "?"}
-              </p>
-            )}
-          </div>
-          <div className="flex gap-2">          
-            <Link
-              href="/cellar"
-              className="rounded-md border border-slate-700 px-4 py-2 text-sm font-semibold hover:bg-slate-900"
-            >
-              Manage my Cellar
-            </Link>
-            <button
-              onClick={handleSignOut}
-              className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold hover:bg-slate-700"
-            >
-              Sign out
-            </button>
-          </div>
-        </header>
-
-        {error && <p className="text-sm text-red-400">{error}</p>}
-        {statusMessage && <p className="text-sm text-indigo-300">{statusMessage}</p>}
-
-        <section className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6">
-          <div className="space-y-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Quick persona selector</h2>
-                <span className="text-xs text-slate-400">{personas.length} personas</span>
-              </div>
-              {personas.length === 0 ? (
-                <p className="text-sm text-slate-400">No personas yet. Create one in your cellar to get started.</p>
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {personas.map((persona) => (
-                    <button
-                      key={persona.id}
-                      onClick={() => setSelectedPersonaId(persona.id)}
-                      className={`rounded-lg border p-3 text-left transition ${
-                        selectedPersonaId === persona.id
-                          ? "border-indigo-500 bg-slate-800/70"
-                          : "border-slate-800 hover:border-slate-700"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold">{persona.name}</span>
-                        {persona.is_default && (
-                          <span className="text-[11px] rounded-full border border-green-500 text-green-400 px-2 py-0.5">
-                            Default
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-400 mt-1">
-                        {persona.color} • {persona.body}-bodied • {persona.min_price ?? "?"} -{" "}
-                        {persona.max_price ?? "?"}
-                      </p>
-                      {persona.grapes.length > 0 && (
-                        <p className="text-[11px] text-slate-400 mt-1 truncate">
-                          Grapes: {persona.grapes.join(", ")}
-                        </p>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Menu photo upload</h2>
-                {parsedListId && <span className="text-xs text-slate-400">List id: {parsedListId}</span>}
-              </div>
-              <div className="grid gap-3 sm:grid-cols-[1.2fr_0.8fr]">
-                <label className="text-sm flex flex-col">
-                  Restaurant (optional)
-                  <input
-                    className="mt-1 rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
-                    value={restaurantName}
-                    onChange={(e) => setRestaurantName(e.target.value)}
-                    placeholder="e.g. Balthazar"
-                  />
-                </label>
-                <label className="text-sm flex flex-col">
-                  Menu photo
-                  <input
-                    className="mt-1 text-sm text-slate-200"
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setMenuFile(e.target.files?.[0] ?? null)}
-                  />
-                </label>
-              </div>
-              <div className="flex flex-wrap gap-3 items-center">
-                <button
-                  onClick={handleUpload}
-                  disabled={isUploading}
-                  className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold hover:bg-indigo-500 disabled:opacity-70"
-                >
-                  {isUploading ? "Uploading…" : "Upload & analyze"}
-                </button>
-                {hasMenu && (
-                  <span className="text-xs text-slate-400">
-                    Parsed {parsedWines.length} items{parsedListId ? ` • list ${parsedListId}` : ""}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-            <h2 className="text-lg font-semibold">Get AI recommendations</h2>
-            <p className="text-sm text-slate-400">
-              Select a persona, upload a menu, then ask the agent to rank wines for you.
-            </p>
-            <button
-              onClick={handleGetRecommendations}
-              disabled={!hasMenu || !selectedPersonaId || isRecommending}
-              className="w-full rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold hover:bg-emerald-500 disabled:opacity-60"
-            >
-              {isRecommending ? "Scoring wines…" : "Get recommendations"}
-            </button>
-            {recommendations && recommendations.length === 0 && (
-              <p className="text-sm text-slate-400">No recommendations returned yet.</p>
-            )}
-            {recommendations && recommendations.length > 0 && (
-              <div className="space-y-3">
-                {recommendations.map((rec, idx) => {
-                  const wine = wineLookup.get(rec.wineId);
-                  return (
-                    <div key={rec.wineId} className="rounded-lg border border-slate-800 p-3 bg-slate-950">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold">
-                            {idx + 1}. {wine?.name ?? "Wine"}{" "}
-                            <span className="text-xs text-slate-500">({rec.wineId})</span>
-                          </p>
-                          {wine?.rawText && <p className="text-xs text-slate-400 mt-1">{wine.rawText}</p>}
-                        </div>
-                        <span className="text-xs rounded-full border border-emerald-500 text-emerald-300 px-2 py-0.5">
-                          {rec.score}%
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-300 mt-2">{rec.reason}</p>
-                      {rec.tags?.length > 0 && (
-                        <p className="text-[11px] text-slate-400 mt-1">Tags: {rec.tags.join(", ")}</p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
-    </main>
+    <MainExperience
+      personas={personas}
+      preferences={preferences}
+      friendlyName={friendlyName}
+      selectedPersonaId={selectedPersonaId}
+      onSelectPersona={setSelectedPersonaId}
+      restaurantName={restaurantName}
+      onRestaurantChange={setRestaurantName}
+      menuFile={menuFile}
+      onFileSelected={handleFileSelected}
+      onUpload={handleUpload}
+      onRequestRecommendations={handleGetRecommendations}
+      isUploading={isUploading}
+      isRecommending={isRecommending}
+      parsedListId={parsedListId}
+      parsedWines={parsedWines}
+      recommendations={recommendations}
+      statusMessage={statusMessage}
+      error={error}
+      onSignOut={handleSignOut}
+    />
   );
 }
